@@ -9,7 +9,7 @@ import ProductCard from "./ProductCard";
 
 const Hero = () => {
   const [filteredProducts, setFilteredProducts] = useState([]);
-  const [selectedItems, setSelectedItems] = useState([]);
+  const [selectedItems, setSelectedItems] = useState({});
   const [totalSelected, setTotalSelected] = useState(0);
   const [totalVolume, setTotalVolume] = useState(0);
   const [show, setShow] = useState(false);
@@ -26,7 +26,7 @@ const Hero = () => {
     const fetchProducts = async () => {
       try {
         const response = await axios.get(
-          "https://deliveryplus.onrender.com/api/products/getallproducts"
+          "http://localhost:5000/api/products/getallproducts"
         );
         const allProducts = response.data;
         const filtered = allProducts.filter(
@@ -43,7 +43,7 @@ const Hero = () => {
   const handleItemClick = async (type) => {
     try {
       const response = await axios.get(
-        "https://deliveryplus.onrender.com/api/products/getallproducts"
+        "http://localhost:5000/api/products/getallproducts"
       );
       const allProducts = response.data;
       const filtered = allProducts.filter((product) => product.type === type);
@@ -55,68 +55,40 @@ const Hero = () => {
 
   const handleAddToSelected = (product, newQuantity) => {
     setSelectedItems((prevItems) => {
-      const nameIndex = prevItems.findIndex((subArray) =>
-        subArray.some((item) => item.name === product.name)
-      );
-
-      let updatedItems;
-      if (nameIndex >= 0) {
-        updatedItems = [...prevItems];
-        const itemIndex = updatedItems[nameIndex].findIndex(
-          (item) => item.id === product.id
-        );
-
-        if (itemIndex >= 0) {
-          if (newQuantity === 0) {
-            updatedItems[nameIndex] = updatedItems[nameIndex].filter(
-              (item) => item.id !== product.id
-            );
-          } else {
-            updatedItems[nameIndex][itemIndex].quantity = newQuantity;
-          }
-        } else {
-          updatedItems[nameIndex].push({ ...product, quantity: newQuantity });
-        }
-      } else {
-        updatedItems = [...prevItems, [{ ...product, quantity: newQuantity }]];
-      }
+      const updatedItems = {
+        ...prevItems,
+        [product._id]: {
+          ...product,
+          quantity: newQuantity,
+        },
+      };
 
       let newTotalSelected = 0;
       let newTotalVolume = 0;
 
-      updatedItems.forEach((subArray) => {
-        subArray.forEach((item) => {
-          newTotalSelected += item.quantity;
-          newTotalVolume += item.quantity * (item.volume || 0);
-        });
+      Object.values(updatedItems).forEach((item) => {
+        newTotalSelected += item.quantity;
+        newTotalVolume += item.quantity * (item.volume || 0);
       });
 
       setTotalSelected(newTotalSelected);
       setTotalVolume(parseFloat(newTotalVolume).toFixed(3));
 
-      return updatedItems.filter((subArray) => subArray.length > 0);
+      return updatedItems;
     });
   };
 
   const handleRemoveItem = (productId) => {
     setSelectedItems((prevItems) => {
-      const updatedItems = prevItems
-        .map((subArray) => {
-          const filteredSubArray = subArray.filter(
-            (item) => item._id !== productId
-          );
-          return filteredSubArray.length > 0 ? filteredSubArray : null;
-        })
-        .filter((subArray) => subArray !== null);
+      const updatedItems = { ...prevItems };
+      delete updatedItems[productId];
 
       let newTotalSelected = 0;
       let newTotalVolume = 0;
 
-      updatedItems.forEach((subArray) => {
-        subArray.forEach((item) => {
-          newTotalSelected += item.quantity;
-          newTotalVolume += item.quantity * (item.volume || 0);
-        });
+      Object.values(updatedItems).forEach((item) => {
+        newTotalSelected += item.quantity;
+        newTotalVolume += item.quantity * (item.volume || 0);
       });
 
       setTotalSelected(newTotalSelected);
@@ -143,23 +115,32 @@ const Hero = () => {
       message: "",
     });
   };
-    
+
   const handleSendDetails = async () => {
-    const formattedSelectedProducts = selectedItems.flat().map((item) => ({
-      product: item._id,
-      quantity: item.quantity,
-      volume: item.volume,
-    }));
-  
+    // Filter out items with zero quantity
+    const formattedSelectedProducts = Object.values(selectedItems)
+      .filter((item) => item.quantity > 0) // Exclude items with zero quantity
+      .map((item) => ({
+        product: item._id,
+        quantity: item.quantity,
+        volume: item.volume,
+      }));
+
+    // Only proceed if there are items to send
+    if (formattedSelectedProducts.length === 0) {
+      alert("No items with quantity greater than zero.");
+      return;
+    }
+
     const dataToSend = {
       ...userDetails,
       selectedProducts: formattedSelectedProducts,
       totalVolume,
     };
-  
+
     try {
       const response = await axios.post(
-        "https://deliveryplus.onrender.com/api/users/adduserdetail",
+        "http://localhost:5000/api/users/adduserdetail",
         dataToSend,
         {
           headers: {
@@ -167,8 +148,8 @@ const Hero = () => {
           },
         }
       );
-  
-      alert("Send data successfully.");
+
+      alert("Data sent successfully.");
       resetUserDetails();
       setIsModalOpen(false);
     } catch (error) {
@@ -176,7 +157,6 @@ const Hero = () => {
       alert("Failed to send details. Please try again.");
     }
   };
-  
 
   return (
     <div className="flex flex-wrap w-full h-full px-2 py-3 sm:py-5 lg:py-10">
@@ -202,7 +182,7 @@ const Hero = () => {
               icon: <MdOutlineOutdoorGrill />,
               label: "Outdoor",
               type: "outdoor",
-            }
+            },
           ].map((item, index) => (
             <div
               key={index}
@@ -218,8 +198,9 @@ const Hero = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredProducts.map((product) => (
             <ProductCard
-              key={product.id}
+              key={product._id}
               product={product}
+              quantity={selectedItems[product._id]?.quantity || 0}
               onSelect={handleAddToSelected}
             />
           ))}
@@ -235,7 +216,7 @@ const Hero = () => {
             <p className="font-semibold text-sm text-gray-700">
               {totalSelected} Selected item(s)
             </p>
-            {selectedItems.length > 0 && (
+            {Object.keys(selectedItems).length > 0 && (
               <div
                 className="px-2 font-semibold hover:cursor-pointer text-[#2A364D]"
                 onClick={() => setShow((prev) => !prev)}
@@ -244,29 +225,29 @@ const Hero = () => {
               </div>
             )}
           </div>
+
           {show && (
             <div className="mt-2">
-              {selectedItems.map((subArray, index) => (
-                <div key={index}>
-                  {subArray.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex justify-between items-center text-sm"
-                    >
-                      <p>{item.name}</p>
-                      <button
-                        onClick={() => handleRemoveItem(item._id)}
-                        className="text-[#2A364D] font-semibold"
-                      >
+              {Object.values(selectedItems)
+                .filter((item) => item.quantity > 0) // Exclude items with zero quantity
+                .map((item, index) => (
+                  <div key={item._id} className="mt-1">
+                    <div className="flex justify-between items-center text-sm">
+                      <p className="font-medium text-gray-700">{item.name}</p>
+                      <div className="flex items-center gap-2">
                         <span className="text-gray-700 font-normal">
                           {item.quantity}
-                        </span>{" "}
-                        [X]
-                      </button>
+                        </span>
+                        <button
+                          onClick={() => handleRemoveItem(item._id)}
+                          className="text-red-500 font-semibold hover:text-red-700 transition"
+                        >
+                          [X]
+                        </button>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              ))}
+                  </div>
+                ))}
             </div>
           )}
         </div>
