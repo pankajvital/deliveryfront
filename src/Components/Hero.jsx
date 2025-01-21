@@ -26,7 +26,7 @@ const Hero = () => {
     const fetchProducts = async () => {
       try {
         const response = await axios.get(
-          "http://localhost:5000/api/products/getallproducts"
+          "https://deliveryplus.onrender.com/api/products/getallproducts"
         );
         const allProducts = response.data;
         const filtered = allProducts.filter(
@@ -43,7 +43,7 @@ const Hero = () => {
   const handleItemClick = async (type) => {
     try {
       const response = await axios.get(
-        "http://localhost:5000/api/products/getallproducts"
+        "https://deliveryplus.onrender.com/api/products/getallproducts"
       );
       const allProducts = response.data;
       const filtered = allProducts.filter((product) => product.type === type);
@@ -140,7 +140,7 @@ const Hero = () => {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/users/adduserdetail",
+        "https://deliveryplus.onrender.com/api/users/adduserdetail",
         dataToSend,
         {
           headers: {
